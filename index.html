@@ -310,22 +310,29 @@ let curTab = 'all';
 const SPORT_ICO = {soccer:'⚽',basketball:'🏀',tennis:'🎾'};
 const ODDS_SPORTS = [
   'soccer_epl','soccer_spain_la_liga','soccer_italy_serie_a','soccer_germany_bundesliga',
-  'soccer_france_ligue_one','soccer_uefa_champs_league','soccer_africa_cup_of_nations',
-  'soccer_netherlands_eredivisie','soccer_turkey_super_league','soccer_brazil_campeonato',
-  'soccer_argentina_primera_division','soccer_mexico_ligamx','soccer_usa_mls',
-  'soccer_portugal_primeira_liga','soccer_scotland_premiership',
-  'basketball_nba','basketball_euroleague',
+  'soccer_france_ligue_one','soccer_uefa_champs_league','soccer_uefa_europa_league',
+  'soccer_africa_cup_of_nations','soccer_netherlands_eredivisie','soccer_turkey_super_league',
+  'soccer_brazil_campeonato','soccer_argentina_primera_division','soccer_mexico_ligamx',
+  'soccer_usa_mls','soccer_portugal_primeira_liga','soccer_scotland_premiership',
+  'soccer_england_league1','soccer_conmebol_copa_libertadores','soccer_japan_j_league',
+  'basketball_nba','basketball_ncaab','basketball_euroleague',
+  'americanfootball_nfl','baseball_mlb','icehockey_nhl',
+  'mma_mixed_martial_arts','aussierules_afl',
   'tennis_atp_french_open','tennis_wta_french_open','tennis_atp_wimbledon','tennis_wta_wimbledon',
 ];
 const LEAGUE_NAMES = {
   soccer_epl:'EPL',soccer_spain_la_liga:'La Liga',soccer_italy_serie_a:'Serie A',
   soccer_germany_bundesliga:'Bundesliga',soccer_france_ligue_one:'Ligue 1',
-  soccer_uefa_champs_league:'UCL',soccer_africa_cup_of_nations:'AFCON',
-  soccer_netherlands_eredivisie:'Eredivisie',soccer_turkey_super_league:'Süper Lig',
-  soccer_brazil_campeonato:'Brasileirão',soccer_argentina_primera_division:'Liga Prof.',
-  soccer_mexico_ligamx:'Liga MX',soccer_usa_mls:'MLS',
-  soccer_portugal_primeira_liga:'Primeira Liga',soccer_scotland_premiership:'SPFL',
-  basketball_nba:'NBA',basketball_euroleague:'EuroLeague',
+  soccer_uefa_champs_league:'UCL',soccer_uefa_europa_league:'UEL',
+  soccer_africa_cup_of_nations:'AFCON',soccer_netherlands_eredivisie:'Eredivisie',
+  soccer_turkey_super_league:'Süper Lig',soccer_brazil_campeonato:'Brasileirão',
+  soccer_argentina_primera_division:'Liga Prof.',soccer_mexico_ligamx:'Liga MX',
+  soccer_usa_mls:'MLS',soccer_portugal_primeira_liga:'Primeira Liga',
+  soccer_scotland_premiership:'SPFL',soccer_england_league1:'Championship',
+  soccer_conmebol_copa_libertadores:'Copa Lib.',soccer_japan_j_league:'J-League',
+  basketball_nba:'NBA',basketball_ncaab:'NCAAB',basketball_euroleague:'EuroLeague',
+  americanfootball_nfl:'NFL',baseball_mlb:'MLB',icehockey_nhl:'NHL',
+  mma_mixed_martial_arts:'MMA',aussierules_afl:'AFL',
   tennis_atp_french_open:'ATP FO',tennis_wta_french_open:'WTA FO',
   tennis_atp_wimbledon:'Wimbledon',tennis_wta_wimbledon:'WTA Wimbledon',
 };
@@ -381,70 +388,40 @@ async function fetchAll() {
     } catch(e) { console.warn('API-Football:',e.message); }
   }
 
-  // TheSportsDB — free, no key, broad fixture coverage
+  // TheSportsDB — free, no key, broad fixture coverage (all sports in parallel)
   showProgress(26,'Fetching fixtures from TheSportsDB (free)…');
-  try {
-    const res = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=Soccer`);
-    if (res.ok) {
-      const data = await res.json();
-      for (const ev of data.events || []) {
+  const sdbSports = [
+    {name:'Soccer',sport:'soccer'},{name:'Basketball',sport:'basketball'},{name:'Tennis',sport:'tennis'},
+    {name:'Baseball',sport:'baseball'},{name:'Ice Hockey',sport:'icehockey'},
+    {name:'American Football',sport:'americanfootball'},{name:'Cricket',sport:'cricket'},
+    {name:'Rugby Union',sport:'rugby'},{name:'Rugby League',sport:'rugby'},
+    {name:'MMA',sport:'mma'},{name:'Boxing',sport:'boxing'},
+    {name:'Motor Sport',sport:'motorsport'},{name:'Golf',sport:'golf'},
+    {name:'Volleyball',sport:'volleyball'},{name:'Handball',sport:'handball'},
+  ];
+  await Promise.allSettled(sdbSports.map(async ({name,sport}) => {
+    try {
+      const r = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=${encodeURIComponent(name)}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      for (const ev of d.events || []) {
         const home = ev.strHomeTeam, away = ev.strAwayTeam;
         if (!home || !away) continue;
         const key = `${home}__${away}`;
         if (!matchMap[key]) {
-          matchMap[key] = {
-            id: ev.idEvent || key,
-            sport: 'soccer',
-            league: ev.strLeague || 'Unknown',
-            country: ev.strCountry || '',
-            home, away,
-            time: ev.strTimestamp ? new Date(ev.strTimestamp) : new Date(),
-            status: 'NS', odds: null, flags: [], edge: 0, analysisResult: null,
-          };
+          matchMap[key] = { id:ev.idEvent||key, sport, league:ev.strLeague||name, country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
         }
       }
-      showProgress(30,`TheSportsDB: ${Object.keys(matchMap).length} total fixtures so far…`);
-    }
-  } catch(e) { console.warn('TheSportsDB:', e.message); }
-
-  // TheSportsDB basketball
-  try {
-    const res2 = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=Basketball`);
-    if (res2.ok) {
-      const data2 = await res2.json();
-      for (const ev of data2.events || []) {
-        const home = ev.strHomeTeam, away = ev.strAwayTeam;
-        if (!home || !away) continue;
-        const key = `${home}__${away}`;
-        if (!matchMap[key]) {
-          matchMap[key] = { id:ev.idEvent||key, sport:'basketball', league:ev.strLeague||'Basketball', country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
-        }
-      }
-    }
-  } catch(e) {}
-
-  // TheSportsDB tennis
-  try {
-    const res3 = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=Tennis`);
-    if (res3.ok) {
-      const data3 = await res3.json();
-      for (const ev of data3.events || []) {
-        const home = ev.strHomeTeam, away = ev.strAwayTeam;
-        if (!home || !away) continue;
-        const key = `${home}__${away}`;
-        if (!matchMap[key]) {
-          matchMap[key] = { id:ev.idEvent||key, sport:'tennis', league:ev.strLeague||'Tennis', country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
-        }
-      }
-    }
-  } catch(e) {}
+    } catch(e) {}
+  }));
+  showProgress(30,`TheSportsDB: ${Object.keys(matchMap).length} total fixtures so far…`);
 
   // Odds API
   if (oddsKey) {
     let done = 0;
     for (const sk of ODDS_SPORTS) {
       try {
-        const sport = sk.startsWith('soccer')?'soccer':sk.startsWith('basketball')?'basketball':'tennis';
+        const sport = sk.startsWith('soccer')?'soccer':sk.startsWith('basketball')?'basketball':sk.startsWith('americanfootball')?'americanfootball':sk.startsWith('baseball')?'baseball':sk.startsWith('icehockey')?'icehockey':sk.startsWith('mma')?'mma':sk.startsWith('aussierules')?'aussierules':sk.startsWith('cricket')?'cricket':sk.startsWith('rugby')?'rugby':'tennis';
         const mkts  = sk.startsWith('soccer')?'h2h,totals,asian_handicap':'h2h,totals';
         const res   = await fetch(`https://api.the-odds-api.com/v4/sports/${sk}/odds/?apiKey=${oddsKey}&regions=eu,uk&markets=${mkts}&oddsFormat=decimal`);
         if (!res.ok){done++;continue;}
@@ -600,7 +577,7 @@ async function analyzeMatch(idx,btnId,arId){
   btn.className='btn-analyze analyzing';btn.textContent='…';
   ar.classList.add('open');
   ar.innerHTML=`<div class="loading"><div class="spin"></div>Analyzing ${m.home} vs ${m.away}…</div>`;
-  const markets=m.sport==='soccer'?'Match Result (1X2), Goals Over/Under 1.5/2.5/3.5, Team to Score (+0.5), Asian Handicap -0.5/+0.5, HT Under 1.5, Excluding Exactly 1 Goal total':m.sport==='basketball'?'Straight Win, Total Points Over/Under':'Match Winner, Set Betting';
+  const markets=m.sport==='soccer'?'Match Result (1X2), Goals Over/Under 1.5/2.5/3.5, Team to Score (+0.5), Asian Handicap -0.5/+0.5, HT Under 1.5, Excluding Exactly 1 Goal total':m.sport==='basketball'?'Straight Win, Spread, Total Points Over/Under':m.sport==='americanfootball'?'Moneyline, Spread, Total Points Over/Under, Player Props':m.sport==='baseball'?'Moneyline, Run Line, Total Runs Over/Under, First 5 Innings':m.sport==='icehockey'?'Moneyline, Puck Line, Total Goals Over/Under, Period Betting':m.sport==='mma'||m.sport==='boxing'?'Fight Winner, Method of Victory, Round Betting, Distance':m.sport==='cricket'?'Match Winner, Top Batsman, Total Runs, Fall of First Wicket':m.sport==='rugby'||m.sport==='aussierules'?'Match Winner, Handicap, Total Points, First Try Scorer':'Match Winner, Set Betting';
   const oddsStr=m.odds?JSON.stringify(m.odds):'No odds';
   const flagsStr=m.flags.length?m.flags.slice(0,5).map(f=>`${f.label} @${f.odds} edge:+${f.edge}%`).join(', '):'None';
   const kf=getSetting('kellyFrac','half');

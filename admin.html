@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PicksIQ · Admin</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f4f4f0;
+  --surface: #ffffff;
+  --border: #ddddd8;
+  --border2: #c8c8c2;
+  --text: #1a1a1a;
+  --t2: #555550;
+  --t3: #999990;
+  --accent: #1a1a1a;
+  --green: #1a7a4a;
+  --green-bg: #eaf5ee;
+  --red: #a0201a;
+  --red-bg: #fdf0ef;
+  --yellow-bg: #fffbea;
+  --yellow: #8a7000;
+  --mono: 'Courier New', Courier, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* Top bar */
+.topbar {
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-family: var(--mono);
+  letter-spacing: 0.5px;
+}
+.topbar-brand { font-weight: bold; letter-spacing: 2px; }
+.topbar-right { color: #888; }
+.topbar-dot { width: 6px; height: 6px; border-radius: 50%; background: #4caf50; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 37px); }
+
+/* Sidebar */
+.sidebar {
+  background: #1a1a1a;
+  color: #ccc;
+  padding: 24px 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.sidebar-section {
+  padding: 6px 20px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #555;
+  text-transform: uppercase;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+.sidebar-item {
+  display: block;
+  padding: 8px 20px;
+  color: #aaa;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-left: 2px solid transparent;
+}
+.sidebar-item:hover { background: #2a2a2a; color: #fff; }
+.sidebar-item.active { background: #222; color: #fff; border-left-color: #fff; }
+.sidebar-item .icon { margin-right: 8px; opacity: 0.6; }
+
+/* Main content */
+.main {
+  padding: 32px 40px;
+  max-width: 760px;
+}
+
+h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.2px;
+}
+
+.page-desc {
+  color: var(--t2);
+  font-size: 13px;
+  margin-bottom: 28px;
+  line-height: 1.6;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Sections */
+.section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.section-head {
+  padding: 14px 20px;
+  background: #fafaf8;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-head h3 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.section-head .badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--yellow-bg);
+  color: var(--yellow);
+  border: 1px solid #e8d800;
+}
+.section-head .badge.required {
+  background: #fff0f0;
+  color: #a00;
+  border-color: #fcc;
+}
+.section-head .badge.optional {
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: #b2dfc4;
+}
+
+.section-body { padding: 20px; }
+
+/* Form fields */
+.field { margin-bottom: 16px; }
+.field:last-child { margin-bottom: 0; }
+
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.field-desc {
+  font-size: 12px;
+  color: var(--t3);
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+
+.input-row { display: flex; gap: 8px; align-items: center; }
+
+input[type="text"],
+input[type="password"],
+input[type="number"] {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #fafafa;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+input:focus { border-color: #1a1a1a; background: #fff; }
+input.saved { border-color: #4caf50; background: #f6fff8; }
+
+.show-toggle {
+  background: none;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--t2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.show-toggle:hover { border-color: #999; color: var(--text); }
+
+.key-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 5px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  display: none;
+}
+.key-status.set { background: var(--green-bg); color: var(--green); display: block; }
+.key-status.empty { background: #f8f8f8; color: var(--t3); display: block; }
+
+/* Buttons */
+.btn {
+  padding: 9px 18px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  font-family: var(--sans);
+}
+.btn-primary {
+  background: #1a1a1a;
+  color: #fff;
+}
+.btn-primary:hover { background: #333; }
+.btn-primary:active { background: #000; }
+
+.btn-danger {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid #fcc;
+}
+.btn-danger:hover { background: var(--red-bg); }
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 999;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: none; }
+.toast.success { border-left: 3px solid #4caf50; }
+.toast.error { border-left: 3px solid #e53935; }
+
+/* Info boxes */
+.info-box {
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+}
+.info-box.note { background: var(--yellow-bg); border: 1px solid #e8d800; color: var(--yellow); }
+.info-box.info { background: #f0f4ff; border: 1px solid #c0cdff; color: #2a3a99; }
+
+/* Status summary */
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.status-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 14px 16px;
+}
+.sc-label { font-family: var(--mono); font-size: 10px; color: var(--t3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+.sc-val { font-size: 13px; font-weight: 700; font-family: var(--mono); }
+.sc-val.set { color: var(--green); }
+.sc-val.unset { color: var(--t3); }
+
+/* Link */
+a { color: #1a1a1a; }
+a:hover { text-decoration: underline; }
+
+.divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+/* Page switcher */
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">PICKSIQ · ADMIN</div>
+  <div class="topbar-right"><span class="topbar-dot"></span>CONFIGURATION PANEL · /admin</div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">Config</div>
+    <div class="sidebar-item active" onclick="showPage('keys', this)"><span class="icon">🔑</span>API Keys</div>
+    <div class="sidebar-item" onclick="showPage('settings', this)"><span class="icon">⚙️</span>Settings</div>
+    <div class="sidebar-section">System</div>
+    <div class="sidebar-item" onclick="showPage('status', this)"><span class="icon">📊</span>Status</div>
+    <div class="sidebar-item" onclick="showPage('clear', this)"><span class="icon">🗑️</span>Clear Data</div>
+    <div class="sidebar-section">Links</div>
+    <div class="sidebar-item" onclick="window.open('/', '_blank')"><span class="icon">↗</span>View Dashboard</div>
+    <div class="sidebar-item" onclick="window.open('https://the-odds-api.com', '_blank')"><span class="icon">↗</span>Odds API Docs</div>
+    <div class="sidebar-item" onclick="window.open('https://rapidapi.com/api-sports/api/api-football', '_blank')"><span class="icon">↗</span>API-Football</div>
+    <div class="sidebar-item" onclick="window.open('https://console.anthropic.com', '_blank')"><span class="icon">↗</span>Anthropic Console</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- PAGE: API KEYS -->
+    <div class="page active" id="page-keys">
+      <h2>API Keys</h2>
+      <div class="page-desc">
+        All keys are stored in your browser's localStorage and never transmitted anywhere except directly to the respective API provider. This panel is only accessible at <code>/admin</code>.
+      </div>
+
+      <!-- Odds API -->
+      <div class="section">
+        <div class="section-head">
+          <h3>The Odds API</h3>
+          <span class="badge">ODDS DATA</span>
+        </div>
+        <div class="section-body">
+          <div class="info-box info">
+            Free tier: 500 requests/month · <a href="https://the-odds-api.com" target="_blank">the-odds-api.com</a> · No credit card required
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <div class="field-desc">Covers EPL, La Liga, Serie A, Bundesliga, Ligue 1, UCL, NBA, ATP/WTA and more.</div>
+            <div class="input-row">
+              <input type="password" id="oddsKey" placeholder="Paste your Odds API key…" oninput="markUnsaved()" />
+              <button class="show-toggle" onclick="toggleVis('oddsKey', this)">Show</button>
+            </div>
+            <div class="key-status" id="oddsKey-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API-Football -->
+      <div class="section">
+        <div class="section-head">
+          <h3>API-Football (RapidAPI)</h3>
+          <span class="badge">ALL LEAGUES</span>
+        </div>
+        <div class="section-body">
+          <div class="info-box info">
+            Free tier: 100 requests/day · <a href="https://rapidapi.com/api-sports/api/api-football" target="_blank">rapidapi.com → API-Football</a> · Sign up for a free RapidAPI account, subscribe to API-Football Free plan
+          </div>
+          <div class="field">
+            <label>RapidAPI Key</label>
+            <div class="field-desc">Covers 1000+ leagues worldwide — Nigerian NPFL, Ghanaian Premier League, CAF, J-League, and every other league not on Odds API.</div>
+            <div class="input-row">
+              <input type="password" id="footballKey" placeholder="Paste your RapidAPI key…" oninput="markUnsaved()" />
+              <button class="show-toggle" onclick="toggleVis('footballKey', this)">Show</button>
+            </div>
+            <div class="key-status" id="footballKey-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claude -->
+      <div class="section">
+        <div class="section-head">
+          <h3>Anthropic Claude API</h3>
+          <span class="badge optional">AI ANALYSIS</span>
+        </div>
+        <div class="section-body">
+          <div class="info-box info">
+            $5 credit = ~600+ match analyses · <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create Key
+          </div>
+          <div class="field">
+            <label>API Key</label>
+            <div class="field-desc">Powers the AI match analysis — top 3 picks with reasoning, confidence scores, and Kelly stake sizing per match.</div>
+            <div class="input-row">
+              <input type="password" id="claudeKey" placeholder="sk-ant-api03-…" oninput="markUnsaved()" />
+              <button class="show-toggle" onclick="toggleVis('claudeKey', this)">Show</button>
+            </div>
+            <div class="key-status" id="claudeKey-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="saveBtn" onclick="saveAll()">Save All Keys</button>
+        <span id="saveHint" style="font-family:var(--mono);font-size:11px;color:var(--t3);display:none;">Unsaved changes</span>
+      </div>
+    </div>
+
+    <!-- PAGE: SETTINGS -->
+    <div class="page" id="page-settings">
+      <h2>Settings</h2>
+      <div class="page-desc">Dashboard behaviour and display preferences. Saved to localStorage.</div>
+
+      <div class="section">
+        <div class="section-head"><h3>Default Filters</h3></div>
+        <div class="section-body">
+          <div class="field">
+            <label>Default Minimum Edge (%)</label>
+            <div class="field-desc">Value bets below this edge % are hidden by default on the dashboard.</div>
+            <input type="number" id="minEdge" placeholder="3" min="0" max="30" style="max-width:120px;" oninput="markUnsaved()" />
+          </div>
+          <div class="field">
+            <label>Default Match Limit</label>
+            <div class="field-desc">How many matches to show per page load.</div>
+            <select id="matchLimit" onchange="markUnsaved()" style="padding:9px 12px;border:1px solid var(--border2);border-radius:4px;font-family:var(--mono);font-size:12px;background:#fafafa;outline:none;width:140px;">
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="0">All</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Default Sort</label>
+            <select id="defaultSort" onchange="markUnsaved()" style="padding:9px 12px;border:1px solid var(--border2);border-radius:4px;font-family:var(--mono);font-size:12px;background:#fafafa;outline:none;width:180px;">
+              <option value="edge">Highest Edge First</option>
+              <option value="time">Kickoff Time</option>
+              <option value="league">League</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-head"><h3>Kelly Fraction</h3></div>
+        <div class="section-body">
+          <div class="field">
+            <label>Default Kelly Fraction</label>
+            <div class="field-desc">Used for stake size recommendations in AI analysis output.</div>
+            <select id="kellyFrac" onchange="markUnsaved()" style="padding:9px 12px;border:1px solid var(--border2);border-radius:4px;font-family:var(--mono);font-size:12px;background:#fafafa;outline:none;width:200px;">
+              <option value="full">Full Kelly</option>
+              <option value="half" selected>Half Kelly (recommended)</option>
+              <option value="quarter">Quarter Kelly</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- PAGE: STATUS -->
+    <div class="page" id="page-status">
+      <h2>Status</h2>
+      <div class="page-desc">Current state of all configured keys and stored data.</div>
+
+      <div class="status-grid" id="statusGrid"></div>
+
+      <div class="section">
+        <div class="section-head"><h3>localStorage Contents</h3></div>
+        <div class="section-body">
+          <div id="lsContents" style="font-family:var(--mono);font-size:12px;line-height:2;color:var(--t2);"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: CLEAR DATA -->
+    <div class="page" id="page-clear">
+      <h2>Clear Data</h2>
+      <div class="page-desc">Remove stored keys and settings from localStorage. This cannot be undone.</div>
+
+      <div class="section">
+        <div class="section-head"><h3>Clear Options</h3></div>
+        <div class="section-body">
+          <div class="info-box note">
+            ⚠️ Clearing keys will require you to re-enter them before the dashboard can fetch data.
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <button class="btn btn-danger" onclick="clearKeys()">Clear API Keys Only</button>
+            <button class="btn btn-danger" onclick="clearSettings()">Clear Settings Only</button>
+            <button class="btn btn-danger" onclick="clearAll()">Clear Everything</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const KEYS = ['oddsKey','footballKey','claudeKey'];
+const SETTINGS_KEYS = ['piq_minEdge','piq_matchLimit','piq_defaultSort','piq_kellyFrac'];
+let unsaved = false;
+
+function init() {
+  // Load keys
+  KEYS.forEach(k => {
+    const val = localStorage.getItem('piq_' + k) || '';
+    const el = document.getElementById(k);
+    if (el) { el.value = val; updateStatus(k, val); }
+  });
+  // Load settings
+  const me = localStorage.getItem('piq_minEdge');
+  const ml = localStorage.getItem('piq_matchLimit');
+  const ds = localStorage.getItem('piq_defaultSort');
+  const kf = localStorage.getItem('piq_kellyFrac');
+  if (me) document.getElementById('minEdge').value = me;
+  if (ml) document.getElementById('matchLimit').value = ml;
+  if (ds) document.getElementById('defaultSort').value = ds;
+  if (kf) document.getElementById('kellyFrac').value = kf;
+}
+
+function updateStatus(key, val) {
+  const el = document.getElementById(key + '-status');
+  if (!el) return;
+  if (val) {
+    el.className = 'key-status set';
+    el.textContent = '✓ Key saved · ' + val.length + ' chars · last 4: …' + val.slice(-4);
+    document.getElementById(key)?.classList.add('saved');
+  } else {
+    el.className = 'key-status empty';
+    el.textContent = '○ Not set';
+    document.getElementById(key)?.classList.remove('saved');
+  }
+}
+
+function saveAll() {
+  KEYS.forEach(k => {
+    const val = document.getElementById(k)?.value.trim() || '';
+    if (val) localStorage.setItem('piq_' + k, val);
+    else localStorage.removeItem('piq_' + k);
+    updateStatus(k, val);
+  });
+  unsaved = false;
+  document.getElementById('saveHint').style.display = 'none';
+  toast('All keys saved successfully.', 'success');
+}
+
+function saveSettings() {
+  const me = document.getElementById('minEdge').value;
+  const ml = document.getElementById('matchLimit').value;
+  const ds = document.getElementById('defaultSort').value;
+  const kf = document.getElementById('kellyFrac').value;
+  if (me) localStorage.setItem('piq_minEdge', me);
+  if (ml) localStorage.setItem('piq_matchLimit', ml);
+  if (ds) localStorage.setItem('piq_defaultSort', ds);
+  if (kf) localStorage.setItem('piq_kellyFrac', kf);
+  unsaved = false;
+  document.getElementById('saveHint').style.display = 'none';
+  toast('Settings saved.', 'success');
+}
+
+function toggleVis(id, btn) {
+  const el = document.getElementById(id);
+  if (el.type === 'password') { el.type = 'text'; btn.textContent = 'Hide'; }
+  else { el.type = 'password'; btn.textContent = 'Show'; }
+}
+
+function markUnsaved() {
+  unsaved = true;
+  document.getElementById('saveHint').style.display = 'inline';
+}
+
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'status') renderStatus();
+}
+
+function renderStatus() {
+  const grid = document.getElementById('statusGrid');
+  const cards = [
+    { label: 'Odds API Key', key: 'piq_oddsKey' },
+    { label: 'API-Football Key', key: 'piq_footballKey' },
+    { label: 'Claude API Key', key: 'piq_claudeKey' },
+  ];
+  grid.innerHTML = cards.map(c => {
+    const val = localStorage.getItem(c.key);
+    return `<div class="status-card">
+      <div class="sc-label">${c.label}</div>
+      <div class="sc-val ${val ? 'set' : 'unset'}">${val ? '✓ SET' : '○ NOT SET'}</div>
+    </div>`;
+  }).join('');
+
+  const ls = document.getElementById('lsContents');
+  const all = Object.keys(localStorage).filter(k => k.startsWith('piq_'));
+  if (!all.length) {
+    ls.textContent = 'No PicksIQ data in localStorage.';
+    return;
+  }
+  ls.innerHTML = all.map(k => {
+    const v = localStorage.getItem(k);
+    const masked = k.includes('Key') ? '…' + v.slice(-6) : v;
+    return `<div><span style="color:#999;width:200px;display:inline-block;">${k}</span><span style="color:#1a1a1a;">${masked}</span></div>`;
+  }).join('');
+}
+
+function clearKeys() {
+  if (!confirm('Clear all API keys?')) return;
+  KEYS.forEach(k => localStorage.removeItem('piq_' + k));
+  init();
+  toast('API keys cleared.', 'success');
+}
+
+function clearSettings() {
+  if (!confirm('Clear all settings?')) return;
+  SETTINGS_KEYS.forEach(k => localStorage.removeItem(k));
+  toast('Settings cleared.', 'success');
+}
+
+function clearAll() {
+  if (!confirm('Clear everything? You will need to re-enter all API keys.')) return;
+  Object.keys(localStorage).filter(k => k.startsWith('piq_')).forEach(k => localStorage.removeItem(k));
+  init();
+  toast('All PicksIQ data cleared.', 'success');
+}
+
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+window.addEventListener('beforeunload', e => {
+  if (unsaved) { e.preventDefault(); e.returnValue = ''; }
+});
+
+init();
+</script>
+</body>
+</html>

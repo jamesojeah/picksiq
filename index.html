@@ -526,6 +526,7 @@ function render(){
     if(curTab!=='all'&&m.sport!==curTab) return false;
     if(vf==='value'&&!m.flags.length) return false;
     if(vf==='high'&&m.edge<8) return false;
+    if(m.time instanceof Date&&!isNaN(m.time)&&m.time.toISOString().split('T')[0]!==viewDate) return false;
     return true;
   });
   list.sort((a,b)=>sb==='edge'?b.edge-a.edge:sb==='time'?a.time-b.time:a.league.localeCompare(b.league));

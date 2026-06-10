@@ -633,17 +633,16 @@ STATIC ODDS (may be stale): ${oddsStr}
 VALUE FLAGS (from static odds): ${flagsStr}
 MARKETS: ${markets}
 
-Before answering:
-1. Search for each team's actual recent results (last 4-5 matches, home/away form where relevant) — verify, don't assume.
-2. Search for current injury, suspension, or lineup news affecting either side.
-3. Search for current best available odds/lines for this match and compare to the static odds above.
+Before answering, do AT MOST 2 web searches total — be efficient, do not search separately for each team or each data point:
+1. One search like "${m.home} vs ${m.away} preview odds" — a good preview/odds article usually covers recent form, injury/lineup news, AND current odds for both teams in a single result.
+2. Only if step 1 left a critical gap (e.g. no injury info at all), one targeted follow-up search.
 
-Give top 3 picks ranked by confidence, informed by what you found. Kelly fraction: ${km}.
+Verify recent form from what you find — don't assume from memory. Give top 3 picks ranked by confidence. Kelly fraction: ${km}.
 
 After research, respond with ONLY a JSON object, no markdown:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","intel":"<2-3 sentences: actual recent form for both teams, any injuries/suspensions/lineup news, and how current market odds compare to the static odds above>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,tools:[{type:'web_search_20260209',name:'web_search',max_uses:5}],messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,tools:[{type:'web_search_20260209',name:'web_search',max_uses:2}],messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');

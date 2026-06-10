@@ -162,6 +162,9 @@ select:focus{border-color:var(--gold);}
 .ar-conf-num{font-family:var(--mono);font-size:12px;font-weight:700;}
 .ar-odds-sug{font-family:var(--mono);font-size:10px;color:var(--t3);}
 .ar-caution{font-family:var(--mono);font-size:10px;color:var(--gold);background:rgba(245,197,24,.07);border:1px solid rgba(245,197,24,.2);border-radius:6px;padding:7px 10px;margin-top:10px;line-height:1.6;}
+.ar-intel{font-family:var(--mono);font-size:11px;color:var(--cyan);background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.2);border-radius:6px;padding:8px 10px;margin-bottom:14px;line-height:1.6;}
+.ar-badge{font-family:var(--mono);font-size:9px;color:var(--cyan);border:1px solid rgba(34,211,238,.3);border-radius:4px;padding:2px 6px;letter-spacing:.5px;}
+.ar-disclaimer{font-family:var(--mono);font-size:9px;color:var(--t3);margin-top:10px;line-height:1.6;font-style:italic;}
 
 /* EMPTY / LOADING */
 .empty{text-align:center;padding:50px 20px;color:var(--t3);}
@@ -623,26 +626,38 @@ async function analyzeMatch(idx,btnId,arId){
   const flagsStr=m.flags.length?m.flags.slice(0,5).map(f=>`${f.label} @${f.odds} edge:+${f.edge}%`).join(', '):'None';
   const kf=getSetting('kellyFrac','half');
   const km=kf==='full'?1:kf==='quarter'?.25:.5;
-  const prompt=`You are a sharp sports betting analyst. Return ONLY a JSON object, no preamble, no markdown.
+  const prompt=`You are a sharp sports betting analyst with live web search. Research this match before answering — do not rely on memory for form, injuries, or odds.
 MATCH: ${m.home} vs ${m.away} | SPORT: ${m.sport} | LEAGUE: ${m.league} | ${m.country}
-ODDS: ${oddsStr}
-VALUE FLAGS: ${flagsStr}
+DATE: ${m.time.toISOString()}
+STATIC ODDS (may be stale): ${oddsStr}
+VALUE FLAGS (from static odds): ${flagsStr}
 MARKETS: ${markets}
-Give top 3 picks ranked by confidence. Kelly fraction: ${km}.
-JSON format:
-{"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
+
+Before answering:
+1. Search for each team's actual recent results (last 4-5 matches, home/away form where relevant) — verify, don't assume.
+2. Search for current injury, suspension, or lineup news affecting either side.
+3. Search for current best available odds/lines for this match and compare to the static odds above.
+
+Give top 3 picks ranked by confidence, informed by what you found. Kelly fraction: ${km}.
+
+After research, respond with ONLY a JSON object, no markdown:
+{"overallConfidence":<50-85>,"reasoning":"<2 sentences>","intel":"<2-3 sentences: actual recent form for both teams, any injuries/suspensions/lineup news, and how current market odds compare to the static odds above>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2048,tools:[{type:'web_search_20260209',name:'web_search',max_uses:5}],messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
-    const raw=data.content?.find(b=>b.type==='text')?.text||'';
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const raw=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+    const jsonMatch=raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('No JSON in response');
+    const parsed=JSON.parse(jsonMatch[0]);
     m.analysisResult=parsed;
     ar.innerHTML=`
-      <div class="ar-header"><div class="ar-title">${m.home} vs ${m.away}</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-family:var(--mono);font-size:10px;color:var(--t3);">CONF.</span><div class="ar-conf">${parsed.overallConfidence}%</div></div></div>
+      <div class="ar-header"><div class="ar-title">${m.home} vs ${m.away}</div><div style="display:flex;align-items:center;gap:8px;"><span class="ar-badge">🔍 Live-researched</span><span style="font-family:var(--mono);font-size:10px;color:var(--t3);">CONF.</span><div class="ar-conf">${parsed.overallConfidence}%</div></div></div>
       <div class="ar-reasoning">${parsed.reasoning}</div>
+      ${parsed.intel?`<div class="ar-intel">🗞️ ${parsed.intel}</div>`:''}
       <div class="ar-picks">${(parsed.picks||[]).slice(0,3).map((p,i)=>`<div class="ar-pick p${i+1}"><div class="ar-rank">PICK #${p.rank}</div><div class="ar-mkt">${p.market}</div><div class="ar-sel p${i+1}">${p.selection}</div><div class="ar-reason">${p.reasoning}</div><div class="ar-bottom"><span class="ar-conf-num" style="color:${i===0?'var(--lime)':i===1?'var(--cyan)':'var(--gold)'}">${p.confidence}%</span><span class="ar-odds-sug">${p.suggestedOdds} · ½K:${p.kellyPct?.toFixed(1)}%</span></div></div>`).join('')}</div>
-      <div class="ar-caution">⚠️ ${parsed.caution}</div>`;
+      <div class="ar-caution">⚠️ ${parsed.caution}</div>
+      <div class="ar-disclaimer">Researched live via web search at analysis time — odds, lineups, and news can still change before kickoff. Verify before betting.</div>`;
     btn.className='btn-analyze done';btn.textContent='✓ Done';
   }catch(e){ar.innerHTML=`<div style="font-family:var(--mono);font-size:12px;color:var(--red);padding:12px;">Failed: ${e.message}</div>`;btn.className='btn-analyze';btn.textContent='🧠 AI';}
 }

@@ -424,6 +424,32 @@ async function fetchAll() {
   }));
   showProgress(30,`TheSportsDB: ${Object.keys(matchMap).length} total fixtures so far…`);
 
+  // ESPN — free, no key. soccer/all covers friendlies + lower/regional leagues; wnba adds women's basketball
+  showProgress(31,'Fetching fixtures from ESPN (free)…');
+  const dateCompact = today.replace(/-/g,'');
+  const espnSources = [
+    {url:`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateCompact}`, sport:'soccer'},
+    {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'WNBA'},
+  ];
+  await Promise.allSettled(espnSources.map(async ({url,sport,league}) => {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return;
+      const d = await r.json();
+      for (const ev of d.events || []) {
+        const competitors = ev.competitions?.[0]?.competitors || [];
+        const home = competitors.find(c=>c.homeAway==='home')?.team?.displayName;
+        const away = competitors.find(c=>c.homeAway==='away')?.team?.displayName;
+        if (!home || !away) continue;
+        const key = `${home}__${away}`;
+        if (!matchMap[key]) {
+          matchMap[key] = { id:ev.id||key, sport, league:league||formatEspnLeague(ev.season?.slug), country:'', home, away, time:ev.date?new Date(ev.date):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
+        }
+      }
+    } catch(e) {}
+  }));
+  showProgress(33,`ESPN: ${Object.keys(matchMap).length} total fixtures so far…`);
+
   // Odds API
   if (oddsKey) {
     let done = 0;
@@ -460,6 +486,11 @@ async function fetchAll() {
   document.getElementById('sTime').textContent = new Date().toLocaleTimeString();
   updateStats();
   render();
+}
+
+function formatEspnLeague(slug) {
+  if (!slug) return 'Soccer';
+  return slug.replace(/^\d{4}(-\d{4})?-/,'').split(/[-_]/).map(w=>w.length<=3?w.toUpperCase():w[0].toUpperCase()+w.slice(1)).join(' ');
 }
 
 function extractOdds(ev,sport) {

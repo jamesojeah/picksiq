@@ -313,11 +313,12 @@ function getSetting(name, def) { return localStorage.getItem('piq_' + name) || d
 let allMatches = [];
 let activeMkts = new Set(['h2h','totals','team_score','asian_handicap','ht_under','excl_1goal','sets']);
 let curTab = 'all';
-let viewDate = new Date().toISOString().split('T')[0];
+function localDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+let viewDate = localDateStr(new Date());
 const matchesByDate = {};
 const SPORT_ICO = {soccer:'⚽',basketball:'🏀',tennis:'🎾'};
 const ODDS_SPORTS = [
-  'soccer_epl','soccer_spain_la_liga','soccer_italy_serie_a','soccer_germany_bundesliga',
+  'soccer_fifa_world_cup','soccer_epl','soccer_spain_la_liga','soccer_italy_serie_a','soccer_germany_bundesliga',
   'soccer_france_ligue_one','soccer_uefa_champs_league','soccer_uefa_europa_league',
   'soccer_africa_cup_of_nations','soccer_netherlands_eredivisie','soccer_turkey_super_league',
   'soccer_brazil_campeonato','soccer_argentina_primera_division','soccer_mexico_ligamx',
@@ -329,6 +330,7 @@ const ODDS_SPORTS = [
   'tennis_atp_french_open','tennis_wta_french_open','tennis_atp_wimbledon','tennis_wta_wimbledon',
 ];
 const LEAGUE_NAMES = {
+  soccer_fifa_world_cup:'World Cup',
   soccer_epl:'EPL',soccer_spain_la_liga:'La Liga',soccer_italy_serie_a:'Serie A',
   soccer_germany_bundesliga:'Bundesliga',soccer_france_ligue_one:'Ligue 1',
   soccer_uefa_champs_league:'UCL',soccer_uefa_europa_league:'UEL',
@@ -417,7 +419,7 @@ async function fetchAll() {
         if (!home || !away) continue;
         const key = `${home}__${away}`;
         if (!matchMap[key]) {
-          matchMap[key] = { id:ev.idEvent||key, sport, league:ev.strLeague||name, country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
+          matchMap[key] = { id:ev.idEvent||key, sport, league:ev.strLeague||name, country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp+'Z'):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
         }
       }
     } catch(e) {}
@@ -429,6 +431,7 @@ async function fetchAll() {
   const dateCompact = today.replace(/-/g,'');
   const espnSources = [
     {url:`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateCompact}`, sport:'soccer'},
+    {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'NBA'},
     {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'WNBA'},
   ];
   await Promise.allSettled(espnSources.map(async ({url,sport,league}) => {
@@ -557,7 +560,7 @@ function render(){
     if(curTab!=='all'&&m.sport!==curTab) return false;
     if(vf==='value'&&!m.flags.length) return false;
     if(vf==='high'&&m.edge<8) return false;
-    if(m.time instanceof Date&&!isNaN(m.time)&&m.time.toISOString().split('T')[0]!==viewDate) return false;
+    if(m.time instanceof Date&&!isNaN(m.time)&&localDateStr(m.time)!==viewDate) return false;
     return true;
   });
   list.sort((a,b)=>sb==='edge'?b.edge-a.edge:sb==='time'?a.time-b.time:a.league.localeCompare(b.league));
@@ -651,7 +654,7 @@ JSON format:
 function setTab(t,el){curTab=t;el.closest('.tabs').querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));el.classList.add('on');document.querySelectorAll('.mkt').forEach(p=>{p.style.display=(t==='all'||p.dataset.sport===t)?'':'none';});render();}
 function setViewDate(offset,btn){
   const d=new Date();d.setDate(d.getDate()+offset);
-  viewDate=d.toISOString().split('T')[0];
+  viewDate=localDateStr(d);
   btn.closest('.tabs').querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
   const lbl=offset===0?'Today':'Tomorrow';
@@ -672,7 +675,7 @@ function updateStats(){
 }
 function showProgress(p,l){document.getElementById('progressWrap').style.display='block';document.getElementById('progressFill').style.width=p+'%';document.getElementById('progressLbl').textContent=l;}
 function hideProgress(){document.getElementById('progressWrap').style.display='none';}
-function setFetching(b){const btn=document.getElementById('fetchBtn');btn.disabled=b;if(!b){const today=new Date().toISOString().split('T')[0];btn.textContent=`⚡ Fetch ${viewDate===today?'Today':'Tomorrow'}`;}else{btn.textContent='Fetching…';}}
+function setFetching(b){const btn=document.getElementById('fetchBtn');btn.disabled=b;if(!b){const today=localDateStr(new Date());btn.textContent=`⚡ Fetch ${viewDate===today?'Today':'Tomorrow'}`;}else{btn.textContent='Fetching…';}}
 function showErr(m){const el=document.getElementById('errBar');el.style.display=m?'block':'none';el.textContent=m;}
 
 init();

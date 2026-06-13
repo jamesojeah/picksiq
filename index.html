@@ -701,7 +701,7 @@ Give top 3 picks ranked by confidence. Kelly fraction: ${km}.
 JSON format:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=data.content?.find(b=>b.type==='text')?.text||'';
@@ -747,7 +747,7 @@ Give top 3 picks ranked by confidence, with your own estimated odds for each (si
 JSON format:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<estimated range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk / data confidence note>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=data.content?.find(b=>b.type==='text')?.text||'';

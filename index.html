@@ -89,6 +89,19 @@ select:focus{border-color:var(--gold);}
 .mkt.on.bball{background:rgba(155,109,255,.1);border-color:var(--purple);color:var(--purple);}
 .mkt.on.tennis{background:rgba(29,233,182,.1);border-color:var(--green);color:var(--green);}
 
+/* CUSTOM PREDICTION */
+.custom-card{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:16px 18px;margin-bottom:18px;}
+.custom-hdr{margin-bottom:12px;}
+.custom-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.custom-form select,.custom-form input{background:var(--s2);border:1px solid var(--b1);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:11px;padding:8px 10px;outline:none;transition:border-color .2s;}
+.custom-form select:focus,.custom-form input:focus{border-color:var(--gold);}
+.custom-form input{flex:1;min-width:140px;}
+.custom-form input::placeholder{color:var(--t3);}
+.btn-predict{background:linear-gradient(135deg,rgba(155,109,255,.3),rgba(0,207,180,.2));border:1px solid rgba(155,109,255,.4);border-radius:7px;color:var(--purple);font-family:var(--mono);font-size:11px;font-weight:700;padding:8px 18px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-predict:hover{background:rgba(155,109,255,.25);border-color:var(--purple);}
+.btn-predict:disabled{opacity:.5;cursor:not-allowed;}
+#cpResult.analysis-row{margin-top:14px;margin-bottom:0;}
+
 /* PROGRESS */
 .progress-wrap{margin-bottom:16px;display:none;}
 .progress-track{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
@@ -284,6 +297,33 @@ select:focus{border-color:var(--gold);}
   <button class="mkt tennis on" data-sport="tennis" data-key="sets" onclick="toggleMkt(this)">🎾 Set Betting</button>
 </div>
 
+<!-- CUSTOM PREDICTION -->
+<div class="custom-card">
+  <div class="custom-hdr">
+    <span class="matches-ttl">🔮 Predict Any Matchup</span>
+  </div>
+  <div class="custom-form">
+    <select id="cpSport">
+      <option value="soccer">⚽ Soccer</option>
+      <option value="basketball">🏀 Basketball</option>
+      <option value="tennis">🎾 Tennis</option>
+      <option value="americanfootball">🏈 American Football</option>
+      <option value="baseball">⚾ Baseball</option>
+      <option value="icehockey">🏒 Ice Hockey</option>
+      <option value="mma">🥊 MMA</option>
+      <option value="boxing">🥊 Boxing</option>
+      <option value="cricket">🏏 Cricket</option>
+      <option value="rugby">🏉 Rugby</option>
+      <option value="aussierules">🏉 Aussie Rules</option>
+    </select>
+    <input id="cpLeague" type="text" placeholder="League / competition (optional)">
+    <input id="cpHome" type="text" placeholder="Team / player A">
+    <input id="cpAway" type="text" placeholder="Team / player B">
+    <button class="btn-predict" id="cpBtn" onclick="customPredict()">🧠 Predict</button>
+  </div>
+  <div class="analysis-row" id="cpResult"></div>
+</div>
+
 <!-- PROGRESS -->
 <div class="progress-wrap" id="progressWrap">
   <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
@@ -330,7 +370,7 @@ const ODDS_SPORTS = [
   'tennis_atp_french_open','tennis_wta_french_open','tennis_atp_wimbledon','tennis_wta_wimbledon',
 ];
 const LEAGUE_NAMES = {
-  soccer_fifa_world_cup:'World Cup',
+  soccer_fifa_world_cup:'FIFA World Cup',
   soccer_epl:'EPL',soccer_spain_la_liga:'La Liga',soccer_italy_serie_a:'Serie A',
   soccer_germany_bundesliga:'Bundesliga',soccer_france_ligue_one:'Ligue 1',
   soccer_uefa_champs_league:'UCL',soccer_uefa_europa_league:'UEL',
@@ -426,9 +466,35 @@ async function fetchAll() {
   }));
   showProgress(30,`TheSportsDB: ${Object.keys(matchMap).length} total fixtures so far…`);
 
-  // ESPN — free, no key. soccer/all covers friendlies + lower/regional leagues; wnba adds women's basketball
-  showProgress(31,'Fetching fixtures from ESPN (free)…');
+  // ESPN — FIFA World Cup, fetched first so it gets the correct league label
+  // before the generic soccer/all pass (which would tag it as "Group Stage" etc.)
   const dateCompact = today.replace(/-/g,'');
+  showProgress(31,'Fetching FIFA World Cup fixtures from ESPN…');
+  try {
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`);
+    if (r.ok) {
+      const d = await r.json();
+      for (const ev of d.events || []) {
+        const competitors = ev.competitions?.[0]?.competitors || [];
+        const home = competitors.find(c=>c.homeAway==='home')?.team?.displayName;
+        const away = competitors.find(c=>c.homeAway==='away')?.team?.displayName;
+        if (!home || !away) continue;
+        const key = `${home}__${away}`;
+        const note = ev.competitions?.[0]?.altGameNote || '';
+        const group = note.includes(',') ? note.split(',')[1].trim() : 'FIFA World Cup';
+        if (!matchMap[key]) {
+          matchMap[key] = { id:ev.id||key, sport:'soccer', league:'FIFA World Cup', country:group, home, away, time:ev.date?new Date(ev.date):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
+        } else {
+          matchMap[key].league = 'FIFA World Cup';
+          matchMap[key].country = group;
+        }
+      }
+    }
+  } catch(e) {}
+  showProgress(32,`FIFA World Cup: ${Object.keys(matchMap).length} total fixtures so far…`);
+
+  // ESPN — free, no key. soccer/all covers friendlies + lower/regional leagues; wnba adds women's basketball
+  showProgress(33,'Fetching fixtures from ESPN (free)…');
   const espnSources = [
     {url:`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateCompact}`, sport:'soccer'},
     {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'NBA'},
@@ -451,7 +517,7 @@ async function fetchAll() {
       }
     } catch(e) {}
   }));
-  showProgress(33,`ESPN: ${Object.keys(matchMap).length} total fixtures so far…`);
+  showProgress(34,`ESPN: ${Object.keys(matchMap).length} total fixtures so far…`);
 
   // Odds API
   if (oddsKey) {
@@ -621,7 +687,7 @@ async function analyzeMatch(idx,btnId,arId){
   btn.className='btn-analyze analyzing';btn.textContent='…';
   ar.classList.add('open');
   ar.innerHTML=`<div class="loading"><div class="spin"></div>Analyzing ${m.home} vs ${m.away}…</div>`;
-  const markets=m.sport==='soccer'?'Match Result (1X2), Goals Over/Under 1.5/2.5/3.5, Team to Score (+0.5), Asian Handicap -0.5/+0.5, HT Under 1.5, Excluding Exactly 1 Goal total':m.sport==='basketball'?'Straight Win, Spread, Total Points Over/Under':m.sport==='americanfootball'?'Moneyline, Spread, Total Points Over/Under, Player Props':m.sport==='baseball'?'Moneyline, Run Line, Total Runs Over/Under, First 5 Innings':m.sport==='icehockey'?'Moneyline, Puck Line, Total Goals Over/Under, Period Betting':m.sport==='mma'||m.sport==='boxing'?'Fight Winner, Method of Victory, Round Betting, Distance':m.sport==='cricket'?'Match Winner, Top Batsman, Total Runs, Fall of First Wicket':m.sport==='rugby'||m.sport==='aussierules'?'Match Winner, Handicap, Total Points, First Try Scorer':'Match Winner, Set Betting';
+  const markets=getMarketsForSport(m.sport);
   const oddsStr=m.odds?JSON.stringify(m.odds):'No odds';
   const flagsStr=m.flags.length?m.flags.slice(0,5).map(f=>`${f.label} @${f.odds} edge:+${f.edge}%`).join(', '):'None';
   const kf=getSetting('kellyFrac','half');
@@ -635,7 +701,7 @@ Give top 3 picks ranked by confidence. Kelly fraction: ${km}.
 JSON format:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=data.content?.find(b=>b.type==='text')?.text||'';
@@ -648,6 +714,51 @@ JSON format:
       <div class="ar-caution">⚠️ ${parsed.caution}</div>`;
     btn.className='btn-analyze done';btn.textContent='✓ Done';
   }catch(e){ar.innerHTML=`<div style="font-family:var(--mono);font-size:12px;color:var(--red);padding:12px;">Failed: ${e.message}</div>`;btn.className='btn-analyze';btn.textContent='🧠 AI';}
+}
+
+function getMarketsForSport(sport){
+  return sport==='soccer'?'Match Result (1X2), Goals Over/Under 1.5/2.5/3.5, Team to Score (+0.5), Asian Handicap -0.5/+0.5, HT Under 1.5, Excluding Exactly 1 Goal total':sport==='basketball'?'Straight Win, Spread, Total Points Over/Under':sport==='americanfootball'?'Moneyline, Spread, Total Points Over/Under, Player Props':sport==='baseball'?'Moneyline, Run Line, Total Runs Over/Under, First 5 Innings':sport==='icehockey'?'Moneyline, Puck Line, Total Goals Over/Under, Period Betting':sport==='mma'||sport==='boxing'?'Fight Winner, Method of Victory, Round Betting, Distance':sport==='cricket'?'Match Winner, Top Batsman, Total Runs, Fall of First Wicket':sport==='rugby'||sport==='aussierules'?'Match Winner, Handicap, Total Points, First Try Scorer':'Match Winner, Set Betting';
+}
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ── CUSTOM PREDICTION (any team/league not in fetched data) ─
+async function customPredict(){
+  const claudeKey=getKey('claudeKey');
+  if(!claudeKey){showErr('Claude API key not set. Go to /admin to add it.');return;}
+  const sport=document.getElementById('cpSport').value;
+  const league=document.getElementById('cpLeague').value.trim();
+  const home=document.getElementById('cpHome').value.trim();
+  const away=document.getElementById('cpAway').value.trim();
+  if(!home||!away){showErr('Enter both team/player names.');return;}
+  showErr('');
+  const btn=document.getElementById('cpBtn'),ar=document.getElementById('cpResult');
+  btn.disabled=true;btn.textContent='…';
+  ar.classList.add('open');
+  ar.innerHTML=`<div class="loading"><div class="spin"></div>Analyzing ${escapeHtml(home)} vs ${escapeHtml(away)}…</div>`;
+  const markets=getMarketsForSport(sport);
+  const kf=getSetting('kellyFrac','half');
+  const km=kf==='full'?1:kf==='quarter'?.25:.5;
+  const prompt=`You are a sharp sports betting analyst. Return ONLY a JSON object, no preamble, no markdown.
+MATCHUP: ${home} vs ${away} | SPORT: ${sport} | LEAGUE/COMPETITION: ${league||'not specified'}
+This matchup is not in our live odds feed — there is no market data available. Use your own knowledge of these teams/players (recent form, head-to-head history, squad strength, home advantage) to assess it. If you don't have reliable information on one or both sides, say so explicitly in the caution field and lower overallConfidence accordingly — do not fabricate specifics you're unsure of.
+MARKETS: ${markets}
+Give top 3 picks ranked by confidence, with your own estimated odds for each (since no market odds exist). Kelly fraction: ${km}.
+JSON format:
+{"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<estimated range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk / data confidence note>"}`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
+    const data=await res.json();
+    const raw=data.content?.find(b=>b.type==='text')?.text||'';
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    ar.innerHTML=`
+      <div class="ar-header"><div class="ar-title">${escapeHtml(home)} vs ${escapeHtml(away)}</div><div style="display:flex;align-items:center;gap:8px;"><span style="font-family:var(--mono);font-size:10px;color:var(--t3);">CONF.</span><div class="ar-conf">${parsed.overallConfidence}%</div></div></div>
+      <div class="ar-reasoning">${parsed.reasoning}</div>
+      <div class="ar-picks">${(parsed.picks||[]).slice(0,3).map((p,i)=>`<div class="ar-pick p${i+1}"><div class="ar-rank">PICK #${p.rank}</div><div class="ar-mkt">${p.market}</div><div class="ar-sel p${i+1}">${p.selection}</div><div class="ar-reason">${p.reasoning}</div><div class="ar-bottom"><span class="ar-conf-num" style="color:${i===0?'var(--lime)':i===1?'var(--cyan)':'var(--gold)'}">${p.confidence}%</span><span class="ar-odds-sug">${p.suggestedOdds} · ½K:${p.kellyPct?.toFixed(1)}%</span></div></div>`).join('')}</div>
+      <div class="ar-caution">⚠️ ${parsed.caution}</div>`;
+  }catch(e){ar.innerHTML=`<div style="font-family:var(--mono);font-size:12px;color:var(--red);padding:12px;">Failed: ${e.message}</div>`;}
+  btn.disabled=false;btn.textContent='🧠 Predict';
 }
 
 // ── HELPERS ───────────────────────────────────────────────

@@ -227,8 +227,8 @@ select:focus{border-color:var(--gold);}
   <div class="nk-left">
     <div class="nk-icon">⚙️</div>
     <div class="nk-text">
-      <h3>API keys not configured</h3>
-      <p>No API keys found. Go to the admin panel to add your Odds API, API-Football, and Claude keys.</p>
+      <h3>Claude API key not set</h3>
+      <p>Add your Anthropic Claude API key in the admin panel to enable AI recommendations. Match data loads automatically — no key required.</p>
     </div>
   </div>
   <button class="btn-admin" onclick="window.location.href='/admin'">Go to Admin →</button>
@@ -254,6 +254,7 @@ select:focus{border-color:var(--gold);}
       <button class="tab" onclick="setTab('soccer',this)">⚽ Soccer</button>
       <button class="tab" onclick="setTab('basketball',this)">🏀 Basketball</button>
       <button class="tab" onclick="setTab('tennis',this)">🎾 Tennis</button>
+      <button class="tab" onclick="setTab('baseball',this)">⚾ Baseball</button>
     </div>
     <div class="tabs" style="margin-left:4px;">
       <button class="tab on" onclick="setViewDate(0,this)">Today</button>
@@ -339,7 +340,7 @@ select:focus{border-color:var(--gold);}
   <div class="empty">
     <div class="empty-ico">🌍</div>
     <h3>No Data Yet</h3>
-    <p>Hit "Fetch Today" to pull all matches worldwide, or tap Demo to preview. Configure API keys at <a href="/admin" style="color:var(--cyan);">/admin</a>.</p>
+    <p>Hit "Fetch Today" to pull today's matches, or tap Demo to preview. Add your Claude API key at <a href="/admin" style="color:var(--cyan);">/admin</a> to enable AI recommendations.</p>
   </div>
 </div>
 
@@ -356,46 +357,14 @@ let curTab = 'all';
 function localDateStr(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 let viewDate = localDateStr(new Date());
 const matchesByDate = {};
-const SPORT_ICO = {soccer:'⚽',basketball:'🏀',tennis:'🎾'};
-const ODDS_SPORTS = [
-  'soccer_fifa_world_cup','soccer_epl','soccer_spain_la_liga','soccer_italy_serie_a','soccer_germany_bundesliga',
-  'soccer_france_ligue_one','soccer_uefa_champs_league','soccer_uefa_europa_league',
-  'soccer_africa_cup_of_nations','soccer_netherlands_eredivisie','soccer_turkey_super_league',
-  'soccer_brazil_campeonato','soccer_argentina_primera_division','soccer_mexico_ligamx',
-  'soccer_usa_mls','soccer_portugal_primeira_liga','soccer_scotland_premiership',
-  'soccer_england_league1','soccer_conmebol_copa_libertadores','soccer_japan_j_league',
-  'basketball_nba','basketball_ncaab','basketball_euroleague',
-  'americanfootball_nfl','baseball_mlb','icehockey_nhl',
-  'mma_mixed_martial_arts','aussierules_afl',
-  'tennis_atp_french_open','tennis_wta_french_open','tennis_atp_wimbledon','tennis_wta_wimbledon',
-];
-const LEAGUE_NAMES = {
-  soccer_fifa_world_cup:'FIFA World Cup',
-  soccer_epl:'EPL',soccer_spain_la_liga:'La Liga',soccer_italy_serie_a:'Serie A',
-  soccer_germany_bundesliga:'Bundesliga',soccer_france_ligue_one:'Ligue 1',
-  soccer_uefa_champs_league:'UCL',soccer_uefa_europa_league:'UEL',
-  soccer_africa_cup_of_nations:'AFCON',soccer_netherlands_eredivisie:'Eredivisie',
-  soccer_turkey_super_league:'Süper Lig',soccer_brazil_campeonato:'Brasileirão',
-  soccer_argentina_primera_division:'Liga Prof.',soccer_mexico_ligamx:'Liga MX',
-  soccer_usa_mls:'MLS',soccer_portugal_primeira_liga:'Primeira Liga',
-  soccer_scotland_premiership:'SPFL',soccer_england_league1:'Championship',
-  soccer_conmebol_copa_libertadores:'Copa Lib.',soccer_japan_j_league:'J-League',
-  basketball_nba:'NBA',basketball_ncaab:'NCAAB',basketball_euroleague:'EuroLeague',
-  americanfootball_nfl:'NFL',baseball_mlb:'MLB',icehockey_nhl:'NHL',
-  mma_mixed_martial_arts:'MMA',aussierules_afl:'AFL',
-  tennis_atp_french_open:'ATP FO',tennis_wta_french_open:'WTA FO',
-  tennis_atp_wimbledon:'Wimbledon',tennis_wta_wimbledon:'WTA Wimbledon',
-};
+const SPORT_ICO = {soccer:'⚽',basketball:'🏀',tennis:'🎾',baseball:'⚾'};
 
 // ── INIT ──────────────────────────────────────────────────
 function init() {
-  const hasOdds = !!getKey('oddsKey');
-  const hasFb   = !!getKey('footballKey');
   const hasClaude = !!getKey('claudeKey');
-  if (!hasOdds && !hasFb) {
+  if (!hasClaude) {
     document.getElementById('noKeysBanner').style.display = 'flex';
     document.getElementById('adminLink').style.display = 'block';
-    document.getElementById('livepill').style.display = 'none';
   }
   // Apply saved settings
   const me = getSetting('minEdge','3');
@@ -407,71 +376,20 @@ function init() {
 }
 
 // ── FETCH ─────────────────────────────────────────────────
+// Single free, no-key ESPN call — keeps match fetching minimal and
+// independent of any personal API keys (Odds API / API-Football unused).
 async function fetchAll() {
-  const oddsKey = getKey('oddsKey');
-  const fbKey   = getKey('footballKey');
-  if (!oddsKey && !fbKey) {
-    document.getElementById('noKeysBanner').style.display = 'flex';
-  }
   showErr('');
   allMatches = [];
   setFetching(true);
   showProgress(0,'Starting fetch…');
   const today = viewDate;
+  const dateCompact = today.replace(/-/g,'');
   let matchMap = {};
 
-  // API-Football
-  if (fbKey) {
-    showProgress(10,'Fetching all fixtures from API-Football…');
-    try {
-      const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${today}`,{headers:{'x-apisports-key':fbKey}});
-      if (res.ok) {
-        const data = await res.json();
-        for (const f of data.response||[]) {
-          const home = f.teams?.home?.name, away = f.teams?.away?.name;
-          if (!home||!away) continue;
-          const key = `${home}__${away}`;
-          matchMap[key] = { id:f.fixture?.id||key, sport:'soccer', league:f.league?.name||'Unknown', country:f.league?.country||'', home, away, time:new Date(f.fixture?.date), status:f.fixture?.status?.short, odds:null, flags:[], edge:0, analysisResult:null };
-        }
-        showProgress(25,`Got ${Object.keys(matchMap).length} fixtures from API-Football…`);
-      }
-    } catch(e) { console.warn('API-Football:',e.message); }
-  }
-
-  // TheSportsDB — free, no key, broad fixture coverage (all sports in parallel)
-  showProgress(26,'Fetching fixtures from TheSportsDB (free)…');
-  const sdbSports = [
-    {name:'Soccer',sport:'soccer'},{name:'Basketball',sport:'basketball'},{name:'Tennis',sport:'tennis'},
-    {name:'Baseball',sport:'baseball'},{name:'Ice Hockey',sport:'icehockey'},
-    {name:'American Football',sport:'americanfootball'},{name:'Cricket',sport:'cricket'},
-    {name:'Rugby Union',sport:'rugby'},{name:'Rugby League',sport:'rugby'},
-    {name:'MMA',sport:'mma'},{name:'Boxing',sport:'boxing'},
-    {name:'Motor Sport',sport:'motorsport'},{name:'Golf',sport:'golf'},
-    {name:'Volleyball',sport:'volleyball'},{name:'Handball',sport:'handball'},
-  ];
-  await Promise.allSettled(sdbSports.map(async ({name,sport}) => {
-    try {
-      const r = await fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${today}&s=${encodeURIComponent(name)}`);
-      if (!r.ok) return;
-      const d = await r.json();
-      for (const ev of d.events || []) {
-        const home = ev.strHomeTeam, away = ev.strAwayTeam;
-        if (!home || !away) continue;
-        const key = `${home}__${away}`;
-        if (!matchMap[key]) {
-          matchMap[key] = { id:ev.idEvent||key, sport, league:ev.strLeague||name, country:ev.strCountry||'', home, away, time:ev.strTimestamp?new Date(ev.strTimestamp+'Z'):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
-        }
-      }
-    } catch(e) {}
-  }));
-  showProgress(30,`TheSportsDB: ${Object.keys(matchMap).length} total fixtures so far…`);
-
-  // ESPN — FIFA World Cup, fetched first so it gets the correct league label
-  // before the generic soccer/all pass (which would tag it as "Group Stage" etc.)
-  const dateCompact = today.replace(/-/g,'');
-  showProgress(31,'Fetching FIFA World Cup fixtures from ESPN…');
+  showProgress(40,'Fetching matches from ESPN (free)…');
   try {
-    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`);
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateCompact}`);
     if (r.ok) {
       const d = await r.json();
       for (const ev of d.events || []) {
@@ -480,73 +398,11 @@ async function fetchAll() {
         const away = competitors.find(c=>c.homeAway==='away')?.team?.displayName;
         if (!home || !away) continue;
         const key = `${home}__${away}`;
-        const note = ev.competitions?.[0]?.altGameNote || '';
-        const group = note.includes(',') ? note.split(',')[1].trim() : 'FIFA World Cup';
-        if (!matchMap[key]) {
-          matchMap[key] = { id:ev.id||key, sport:'soccer', league:'FIFA World Cup', country:group, home, away, time:ev.date?new Date(ev.date):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
-        } else {
-          matchMap[key].league = 'FIFA World Cup';
-          matchMap[key].country = group;
-        }
+        matchMap[key] = { id:ev.id||key, sport:'soccer', league:formatEspnLeague(ev.season?.slug), country:'', home, away, time:ev.date?new Date(ev.date):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
       }
     }
   } catch(e) {}
-  showProgress(32,`FIFA World Cup: ${Object.keys(matchMap).length} total fixtures so far…`);
-
-  // ESPN — free, no key. soccer/all covers friendlies + lower/regional leagues; wnba adds women's basketball
-  showProgress(33,'Fetching fixtures from ESPN (free)…');
-  const espnSources = [
-    {url:`https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=${dateCompact}`, sport:'soccer'},
-    {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'NBA'},
-    {url:`https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/scoreboard?dates=${dateCompact}`, sport:'basketball', league:'WNBA'},
-  ];
-  await Promise.allSettled(espnSources.map(async ({url,sport,league}) => {
-    try {
-      const r = await fetch(url);
-      if (!r.ok) return;
-      const d = await r.json();
-      for (const ev of d.events || []) {
-        const competitors = ev.competitions?.[0]?.competitors || [];
-        const home = competitors.find(c=>c.homeAway==='home')?.team?.displayName;
-        const away = competitors.find(c=>c.homeAway==='away')?.team?.displayName;
-        if (!home || !away) continue;
-        const key = `${home}__${away}`;
-        if (!matchMap[key]) {
-          matchMap[key] = { id:ev.id||key, sport, league:league||formatEspnLeague(ev.season?.slug), country:'', home, away, time:ev.date?new Date(ev.date):new Date(), status:'NS', odds:null, flags:[], edge:0, analysisResult:null };
-        }
-      }
-    } catch(e) {}
-  }));
-  showProgress(34,`ESPN: ${Object.keys(matchMap).length} total fixtures so far…`);
-
-  // Odds API
-  if (oddsKey) {
-    let done = 0;
-    for (const sk of ODDS_SPORTS) {
-      try {
-        const sport = sk.startsWith('soccer')?'soccer':sk.startsWith('basketball')?'basketball':sk.startsWith('americanfootball')?'americanfootball':sk.startsWith('baseball')?'baseball':sk.startsWith('icehockey')?'icehockey':sk.startsWith('mma')?'mma':sk.startsWith('aussierules')?'aussierules':sk.startsWith('cricket')?'cricket':sk.startsWith('rugby')?'rugby':'tennis';
-        const mkts  = sk.startsWith('soccer')?'h2h,totals,asian_handicap':'h2h,totals';
-        const res   = await fetch(`https://api.the-odds-api.com/v4/sports/${sk}/odds/?apiKey=${oddsKey}&regions=eu,uk&markets=${mkts}&oddsFormat=decimal`);
-        if (!res.ok){done++;continue;}
-        const rl = res.headers.get('x-requests-remaining');
-        if (rl) document.getElementById('sLeagues').title = `Requests left: ${rl}`;
-        const events = await res.json();
-        for (const ev of events) {
-          const {home_team,away_team,commence_time,bookmakers} = ev;
-          if (!home_team||!away_team||!bookmakers?.length) continue;
-          const key = `${home_team}__${away_team}`;
-          const oddsData = extractOdds(ev,sport);
-          const flags = computeFlags(oddsData,sport);
-          const topEdge = flags.length ? Math.max(...flags.map(f=>f.edge||0)) : 0;
-          const existing = matchMap[key];
-          if (existing) { existing.odds=oddsData; existing.flags=flags; existing.edge=topEdge; }
-          else { matchMap[key]={ id:key, sport, league:LEAGUE_NAMES[sk]||sk, country:'', home:home_team, away:away_team, time:new Date(commence_time), status:'NS', odds:oddsData, flags, edge:topEdge, analysisResult:null }; }
-        }
-        done++;
-        showProgress(35+Math.round(done/ODDS_SPORTS.length*55),`Odds: ${done}/${ODDS_SPORTS.length} leagues…`);
-      } catch(e){done++;}
-    }
-  }
+  showProgress(80,`ESPN: ${Object.keys(matchMap).length} fixtures…`);
 
   allMatches = Object.values(matchMap).sort((a,b)=>a.time-b.time);
   matchesByDate[viewDate] = allMatches;
@@ -560,33 +416,6 @@ async function fetchAll() {
 function formatEspnLeague(slug) {
   if (!slug) return 'Soccer';
   return slug.replace(/^\d{4}(-\d{4})?-/,'').split(/[-_]/).map(w=>w.length<=3?w.toUpperCase():w[0].toUpperCase()+w.slice(1)).join(' ');
-}
-
-function extractOdds(ev,sport) {
-  const best={};
-  for(const bk of ev.bookmakers||[]) for(const mkt of bk.markets||[]) for(const oc of mkt.outcomes||[]) {
-    const label = mkt.key==='totals'?`${oc.name} ${oc.point}`:mkt.key==='asian_handicap'?`${oc.name} ${oc.point>0?'+':''}${oc.point}`:oc.name;
-    if(!best[label]||oc.price>best[label].odds) best[label]={odds:oc.price,book:bk.title,mktKey:mkt.key};
-  }
-  return best;
-}
-
-function computeFlags(oddsData,sport) {
-  if(!oddsData||!Object.keys(oddsData).length) return [];
-  const flags=[], byMkt={};
-  for(const [label,d] of Object.entries(oddsData)){
-    if(!byMkt[d.mktKey]) byMkt[d.mktKey]=[];
-    byMkt[d.mktKey].push({label,...d});
-  }
-  for(const [,entries] of Object.entries(byMkt)){
-    const over=entries.reduce((s,e)=>s+1/e.odds,0);
-    for(const e of entries){
-      const fair=(1/e.odds)/over;
-      const edge=(e.odds*fair-1)*100;
-      if(edge>=3) flags.push({label:e.label,mktKey:e.mktKey,odds:e.odds,book:e.book,edge:parseFloat(edge.toFixed(1)),fairProb:fair});
-    }
-  }
-  return flags.sort((a,b)=>b.edge-a.edge);
 }
 
 // ── DEMO ──────────────────────────────────────────────────
@@ -606,6 +435,7 @@ function loadDemo(){
     mk('soccer','Rwanda PL','Rwanda','APR FC','Rayon Sports',6,{H:1.80,D:3.20,A:4.20},[{label:'Over 1.5',mktKey:'totals',odds:1.65,book:'Betika',edge:10.2,fairProb:.67}]),
     mk('soccer','Brasileirão','Brazil','Flamengo','Palmeiras',5,{H:2.30,D:3.10,A:3.00},[{label:'Excl 1 Goal',mktKey:'excl_1goal',odds:2.20,book:'Betano',edge:15.0,fairProb:.49}]),
     mk('soccer','J-League','Japan','Urawa','Kashima',2,{H:2.20,D:3.10,A:3.40},[{label:'Draw',mktKey:'h2h',odds:3.10,book:'Pinnacle',edge:5.4,fairProb:.35}]),
+    mk('soccer','Eliteserien','Norway','Bodø/Glimt','Molde',4,{H:1.85,D:3.50,A:4.00},[{label:'Over 2.5',mktKey:'totals',odds:1.80,book:'Pinnacle',edge:11.5,fairProb:.62}]),
     mk('basketball','NBA','USA','Lakers','Celtics',7,{H:2.15,A:1.75},[{label:'Celtics',mktKey:'h2h',odds:1.75,book:'FanDuel',edge:10.2,fairProb:.62}]),
     mk('basketball','NBA','USA','Warriors','Bucks',8,{H:1.90,A:1.95},[{label:'Over 224.5',mktKey:'totals',odds:1.95,book:'BetMGM',edge:9.1,fairProb:.56}]),
     mk('tennis','ATP FO','France','Djokovic','Alcaraz',9,{H:2.00,A:1.85},[{label:'Alcaraz',mktKey:'h2h',odds:1.85,book:'Betfair',edge:13.5,fairProb:.60}]),
@@ -613,6 +443,13 @@ function loadDemo(){
   ];
   document.getElementById('sTime').textContent=new Date().toLocaleTimeString();
   updateStats();render();
+}
+
+// ── FILTERS ───────────────────────────────────────────────
+function isBrazilianLeague(m){
+  const c=(m.country||'').toLowerCase();
+  const l=(m.league||'').toLowerCase();
+  return c==='brazil'||c==='brasil'||l.includes('brasil')||l.includes('brazil');
 }
 
 // ── RENDER ────────────────────────────────────────────────
@@ -624,6 +461,7 @@ function render(){
 
   let list=allMatches.filter(m=>{
     if(curTab!=='all'&&m.sport!==curTab) return false;
+    if(isBrazilianLeague(m)) return false;
     if(vf==='value'&&!m.flags.length) return false;
     if(vf==='high'&&m.edge<8) return false;
     if(m.time instanceof Date&&!isNaN(m.time)&&localDateStr(m.time)!==viewDate) return false;
@@ -681,9 +519,10 @@ async function analyzeMatch(idx,btnId,arId){
   const claudeKey=getKey('claudeKey');
   if(!claudeKey){showErr('Claude API key not set. Go to /admin to add it.');return;}
   const btn=document.getElementById(btnId),ar=document.getElementById(arId);
-  if(ar.classList.contains('open')&&ar.innerHTML.trim()){ar.classList.remove('open');btn.textContent='🧠 AI';btn.className='btn-analyze';return;}
   const m=document.getElementById('matchesWrap')._list?.[idx];
   if(!m) return;
+  if(ar.classList.contains('open')){ar.classList.remove('open');btn.textContent=m.analysisResult?'✓ Done':'🧠 AI';btn.className=m.analysisResult?'btn-analyze done':'btn-analyze';return;}
+  if(m.analysisResult){ar.classList.add('open');btn.className='btn-analyze done';btn.textContent='✓ Done';return;}
   btn.className='btn-analyze analyzing';btn.textContent='…';
   ar.classList.add('open');
   ar.innerHTML=`<div class="loading"><div class="spin"></div>Analyzing ${m.home} vs ${m.away}…</div>`;
@@ -702,7 +541,7 @@ Give top 3 picks ranked by confidence. Kelly fraction: ${km}.
 JSON format:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-8',max_tokens:2000,tools:[{type:'web_search_20260209',name:'web_search',max_uses:3}],messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-8',max_tokens:2000,tools:[{type:'web_search_20260209',name:'web_search',max_uses:1}],messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n')||'';
@@ -750,7 +589,7 @@ Give top 3 picks ranked by confidence, with your own estimated odds for each (si
 JSON format:
 {"overallConfidence":<50-85>,"reasoning":"<2 sentences>","picks":[{"rank":1,"market":"<name>","selection":"<pick>","confidence":<number>,"reasoning":"<1 sentence>","suggestedOdds":"<estimated range>","kellyPct":<number>},{"rank":2,...},{"rank":3,...}],"caution":"<risk / data confidence note>"}`;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-8',max_tokens:2000,tools:[{type:'web_search_20260209',name:'web_search',max_uses:3}],messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-8',max_tokens:2000,tools:[{type:'web_search_20260209',name:'web_search',max_uses:1}],messages:[{role:'user',content:prompt}]})});
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`API ${res.status}`);}
     const data=await res.json();
     const raw=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('\n')||'';
